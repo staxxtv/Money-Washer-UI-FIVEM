@@ -1,28 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, ArrowRightCircle, BarChart2, History, LogOut, Banknote, CreditCard, Timer } from 'lucide-react';
 
-interface Transaction {
-  id: number;
-  type: string;
-  amount: number;
-  fee: number;
-  timestamp: string; // Changed to string for simpler NUI handling
-}
-
-interface Card {
-  id: number;
-  type: string;
-  number: string;
-  color: string;
-}
-
 function App() {
-  const [isVisible, setIsVisible] = useState(false); // UI visibility controlled by FiveM
-  const [cleanMoney, setCleanMoney] = useState(0); // Player's cash balance
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isVisible, setIsVisible] = useState(false);
+  const [cleanMoney, setCleanMoney] = useState(0);
+  const [transactions, setTransactions] = useState([]);
   const [isWashing, setIsWashing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [cards] = useState<Card[]>([
+  const [cards] = useState([
     {
       id: 1,
       type: 'Platinum',
@@ -31,7 +16,6 @@ function App() {
     }
   ]);
 
-  // Listen for NUI messages from FiveM
   useEffect(() => {
     const handleMessage = (event) => {
       const data = event.data;
@@ -39,6 +23,8 @@ function App() {
         setIsVisible(true);
       } else if (data.action === "hide") {
         setIsVisible(false);
+        setIsWashing(false);
+        setProgress(0);
       } else if (data.action === "update") {
         setCleanMoney(data.cash || 0);
         setTransactions(data.transactions || []);
@@ -46,7 +32,7 @@ function App() {
         setIsWashing(true);
         setProgress(data.progress || 0);
         if (data.progress >= 100) {
-          setTimeout(() => setIsWashing(false), 1000); // Reset after completion
+          setTimeout(() => setIsWashing(false), 1000);
         }
       }
     };
@@ -55,47 +41,33 @@ function App() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  // Send NUI callbacks to FiveM
-  const sendNUICallback = (callback, data = {}) => {
+  const sendNUICallback = (callback) => {
     fetch(`https://${window.GetParentResourceName?.() || 'qb-moneywasher'}/${callback}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+      body: JSON.stringify({})
     });
   };
 
-  const handleWashDirty = () => {
-    if (!isWashing) sendNUICallback('washDirty');
-  };
+  const handleWashDirty = () => !isWashing && sendNUICallback('washDirty');
+  const handleWashMarked = () => !isWashing && sendNUICallback('washMarked');
+  const handleLogout = () => sendNUICallback('exit');
 
-  const handleWashMarked = () => {
-    if (!isWashing) sendNUICallback('washMarked');
-  };
-
-  const handleLogout = () => {
-    sendNUICallback('exit');
-  };
-
-  if (!isVisible) return null; // UI hidden by default until FiveM triggers it
+  if (!isVisible) return null;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-gray-900 p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
             <DollarSign className="w-8 h-8 text-white" />
             <h1 className="text-2xl font-bold text-white">iMoneyWasher</h1>
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-white hover:text-blue-200 transition-colors"
-          >
+          <button onClick={handleLogout} className="text-white hover:text-blue-200 transition-colors">
             <LogOut className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Cards Wallet */}
         <div className="mb-8 overflow-x-auto pb-4">
           <div className="flex gap-4">
             {cards.map(card => (
@@ -119,7 +91,6 @@ function App() {
           </div>
         </div>
 
-        {/* Balance Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6">
             <div className="flex items-center gap-3 mb-3">
@@ -137,7 +108,6 @@ function App() {
           </div>
         </div>
 
-        {/* Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <button
             onClick={handleWashDirty}
@@ -157,7 +127,6 @@ function App() {
           </button>
         </div>
 
-        {/* Progress Bar */}
         {isWashing && (
           <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 mb-8">
             <div className="flex items-center gap-3 mb-4">
@@ -175,22 +144,21 @@ function App() {
           </div>
         )}
 
-        {/* Transaction History */}
         <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6">
           <h3 className="text-xl font-semibold text-white mb-4">Recent Transactions</h3>
           <div className="space-y-4">
-            {transactions.map(transaction => (
+            {transactions.map(tx => (
               <div
-                key={transaction.id}
+                key={tx.id}
                 className="bg-white/5 rounded-lg p-4 flex justify-between items-center"
               >
                 <div>
-                  <p className="text-white font-medium">{transaction.type}</p>
-                  <p className="text-sm text-blue-200">{transaction.timestamp}</p>
+                  <p className="text-white font-medium">{tx.type}</p>
+                  <p className="text-sm text-blue-200">{tx.timestamp}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-white font-medium">${transaction.amount.toLocaleString()}</p>
-                  <p className="text-sm text-blue-200">Fee: ${transaction.fee.toLocaleString()}</p>
+                  <p className="text-white font-medium">${tx.amount.toLocaleString()}</p>
+                  <p className="text-sm text-blue-200">Fee: ${tx.fee.toLocaleString()}</p>
                 </div>
               </div>
             ))}
